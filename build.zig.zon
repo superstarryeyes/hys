@@ -1,0 +1,16 @@
+.{
+    .name = .app,
+    .version = "0.1.0",
+    .dependencies = .{
+        .libexpat = .{
+            .url = "git+https://github.com/allyourcodebase/libexpat.git?ref=2.7.1-1#472c1db660c813a952f235cb394f5997d2e83fe1",
+            .hash = "libexpat-2.7.1-1-y_akI-w7AABhqRN54g--MNNIR-zA1X2WZ36ZPriY84sb",
+        },
+        .zdt = .{
+            .url = "git+https://codeberg.org/FObersteiner/zdt.git#514658c852d2026b1acf2c7975d35eea3dba423e",
+            .hash = "zdt-0.8.1-xr0_vAxUDwCJRDh9pcAS_mdZBIsvcGTtN-K8JJSWY4I6",
+        },
+    },
+    .paths = .{""},
+    .fingerprint = 0xc96e70cf2bd0cc3b,
+}

@@ -1,0 +1,27 @@
+# Zig build artifacts
+.zig-cache/
+zig-out/
+build-*/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+.env.local
+.env.*.local
+
+# Build and dependency files
+/build/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+
+# OS-specific files
+Thumbs.db
+.DS_Store

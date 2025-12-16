@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This file contains intentionally malformed XML for testing parser robustness -->
+
+<!-- Test 1: Unclosed tags (parser should handle gracefully) -->
+<rss version="2.0">
+<channel>
+    <title>Malformed Feed
+    <link>https://example.com</link>
+    <description>Testing malformed content handling</description>
+    
+    <!-- Test 2: Unescaped ampersands (common in real-world feeds) -->
+    <item>
+        <title>Tom & Jerry - A Classic Show</title>
+        <link>https://example.com/tom&jerry</link>
+        <description>Characters like Tom & Jerry & others appeared in AT&T ads</description>
+        <guid>unescaped-ampersand-1</guid>
+    </item>
+    
+    <!-- Test 3: Unescaped less-than/greater-than -->
+    <item>
+        <title>Price: $100 < $200 > $50</title>
+        <description>Math: 5<10 and 15>10</description>
+        <guid>unescaped-ltgt-2</guid>
+    </item>
+    
+    <!-- Test 4: Invalid numeric entities -->
+    <item>
+        <title>Entity &#999999999; overflow</title>
+        <description>Invalid &#xZZZZ; hex entity</description>
+        <guid>bad-entities-3</guid>
+    </item>
+    
+    <!-- Test 5: Nested CDATA issues -->
+    <item>
+        <title><![CDATA[Normal CDATA]]></title>
+        <description><![CDATA[Nested ]]> in CDATA]]></description>
+        <guid>nested-cdata-4</guid>
+    </item>
+    
+    <!-- Test 6: Empty/whitespace-only fields -->
+    <item>
+        <title>   </title>
+        <link></link>
+        <description>
+
+        </description>
+        <guid>empty-fields-5</guid>
+    </item>
+    
+    <!-- Test 7: Very long content (potential buffer issues) -->
+    <item>
+        <title>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</title>
+        <guid>long-content-6</guid>
+    </item>
+    
+    <!-- Test 8: Control characters -->
+    <item>
+        <title>Control chars:  &#x00; &#x0B; &#x1F;</title>
+        <guid>control-chars-7</guid>
+    </item>
+    
+    <!-- Test 9: Mixed encodings (emoji + CJK + RTL) -->
+    <item>
+        <title>🚀 日本語 مرحبا עברית</title>
+        <description>Mixed: émoji 中文 العربية</description>
+        <guid>mixed-encoding-8</guid>
+    </item>
+
+</channel>
+</rss>

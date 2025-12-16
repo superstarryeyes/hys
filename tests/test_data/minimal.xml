@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+<title>Minimal Feed</title>
+<link>https://example.com</link>
+<description>A minimal RSS feed for testing</description>
+
+<item>
+<title>Simple Item</title>
+<link>https://example.com/simple</link>
+<guid>simple-1</guid>
+</item>
+
+</channel>
+</rss>

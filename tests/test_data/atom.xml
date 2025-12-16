@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Test Atom Feed</title>
+  <subtitle>An Atom 1.0 feed for testing</subtitle>
+  <link href="https://example.com/atom" rel="self"/>
+  <link href="https://example.com/"/>
+  <id>urn:uuid:60a76c80-d399-11d9-b93C-0003939e0af6</id>
+  <updated>2024-10-02T18:30:00Z</updated>
+  <author>
+    <name>Test Author</name>
+    <email>test@example.com</email>
+  </author>
+
+  <!-- Standard Atom entry with all fields -->
+  <entry>
+    <title>Full Atom Entry</title>
+    <link href="https://example.com/atom/entry1"/>
+    <link rel="alternate" type="text/html" href="https://example.com/atom/entry1.html"/>
+    <id>urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6a</id>
+    <updated>2024-10-02T18:30:00Z</updated>
+    <published>2024-10-02T12:00:00Z</published>
+    <summary>This is the summary of the first atom entry.</summary>
+    <content type="html"><![CDATA[
+      <p>This is the full content of the entry.</p>
+      <p>It contains <strong>HTML markup</strong>.</p>
+    ]]></content>
+    <author>
+      <name>Entry Author</name>
+    </author>
+  </entry>
+
+  <!-- Entry with href in link attribute (Atom style) -->
+  <entry>
+    <title>Atom Link Style Entry</title>
+    <link href="https://example.com/atom/entry2" rel="alternate" type="text/html"/>
+    <id>tag:example.com,2024:entry2</id>
+    <updated>2024-10-01T10:00:00Z</updated>
+    <summary>Entry using Atom-style link with href attribute.</summary>
+  </entry>
+
+  <!-- Entry with content but no summary -->
+  <entry>
+    <title>Content Only Entry</title>
+    <link href="https://example.com/atom/entry3"/>
+    <id>tag:example.com,2024:entry3</id>
+    <updated>2024-09-30T08:00:00Z</updated>
+    <content>Plain text content without HTML.</content>
+  </entry>
+
+  <!-- Entry with summary but no content -->
+  <entry>
+    <title>Summary Only Entry</title>
+    <link href="https://example.com/atom/entry4"/>
+    <id>tag:example.com,2024:entry4</id>
+    <updated>2024-09-29T15:30:00-05:00</updated>
+    <summary>This entry only has a summary, no content element.</summary>
+  </entry>
+
+  <!-- Entry with multiple link types -->
+  <entry>
+    <title>Multiple Links Entry</title>
+    <link href="https://example.com/atom/entry5" rel="alternate"/>
+    <link href="https://example.com/atom/entry5/enclosure.mp3" rel="enclosure" type="audio/mpeg"/>
+    <link href="https://example.com/atom/entry5/related" rel="related"/>
+    <id>tag:example.com,2024:entry5</id>
+    <updated>2024-09-28T20:00:00Z</updated>
+    <summary>Entry with multiple link elements of different types.</summary>
+  </entry>
+
+  <!-- Entry with category tags -->
+  <entry>
+    <title>Categorized Entry</title>
+    <link href="https://example.com/atom/entry6"/>
+    <id>tag:example.com,2024:entry6</id>
+    <updated>2024-09-27T09:00:00Z</updated>
+    <category term="technology"/>
+    <category term="news"/>
+    <summary>Entry with category metadata.</summary>
+  </entry>
+
+  <!-- Entry with contributor -->
+  <entry>
+    <title>Contributed Entry</title>
+    <link href="https://example.com/atom/entry7"/>
+    <id>tag:example.com,2024:entry7</id>
+    <updated>2024-09-26T14:00:00Z</updated>
+    <author>
+      <name>Main Author</name>
+    </author>
+    <contributor>
+      <name>Contributor Name</name>
+    </contributor>
+    <summary>Entry with both author and contributor.</summary>
+  </entry>
+
+  <!-- Entry with rich content -->
+  <entry>
+    <title type="html">&lt;b&gt;HTML Title&lt;/b&gt; with &amp; entities</title>
+    <link href="https://example.com/atom/entry8"/>
+    <id>tag:example.com,2024:entry8</id>
+    <updated>2024-09-25T11:30:00Z</updated>
+    <summary type="html">&lt;p&gt;HTML summary with &lt;a href="https://example.com"&gt;link&lt;/a&gt;&lt;/p&gt;</summary>
+    <content type="xhtml">
+      <div xmlns="http://www.w3.org/1999/xhtml">
+        <p>XHTML content in the feed.</p>
+      </div>
+    </content>
+  </entry>
+
+</feed>

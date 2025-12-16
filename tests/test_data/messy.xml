@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Messy RSS feed for testing edge cases -->
+<rss version="2.0">
+<channel>
+<Title>Messy Test Feed</Title>
+<link>https://example.com&amp;section=rss</link>
+<description><![CDATA[This is a <b>messy</b> description with &amp; entities]]></description>
+
+<!-- Item with mixed case tags and HTML entities -->
+<item>
+<TITLE>Item with &lt;HTML&gt; entities &amp; special chars</TITLE>
+<Description><![CDATA[
+  <p>This description has <b>bold</b> and <i>italic</i> text.</p>
+  <p>It also has &emdash; and &#8211; (n-dash) and &#x2014; (m-dash)</p>
+  <p>Smart quotes: &#8220;Hello&#8221; and &#8216;World&#8217;</p>
+]]></Description>
+<PubDate>Wed, 02 Oct 2024 15:30:00 GMT</PubDate>
+<link>https://example.com/article?utm_source=test&amp;id=1</link>
+<guid>item-1-mixed-case</guid>
+</item>
+
+<!-- Item with ISO 8601 date -->
+<item>
+<title>ISO Date Test</title>
+<description>Testing ISO 8601 date format</description>
+<pubDate>2024-10-02T15:30:00+02:00</pubDate>
+<link>https://example.com/iso-date</link>
+<guid isPermaLink="false">urn:uuid:12345-abc-def</guid>
+</item>
+
+<!-- Item with RFC 822 date and timezone abbreviation -->
+<item>
+<title>RFC 822 Date with EST timezone</title>
+<description>Testing EST timezone handling</description>
+<pubDate>Wed, 02 Oct 2024 10:30:00 EST</pubDate>
+<link>https://example.com/est-timezone</link>
+<guid>item-est-tz</guid>
+</item>
+
+<!-- Item with no GUID (should use link as identifier) -->
+<item>
+<title>No GUID Test</title>
+<description>This item has no GUID</description>
+<pubDate>Tue, 01 Oct 2024 12:00:00 GMT</pubDate>
+<link>https://example.com/no-guid-article</link>
+</item>
+
+<!-- Item with empty description -->
+<item>
+<title>Empty Description Test</title>
+<description></description>
+<pubDate>Mon, 30 Sep 2024 09:00:00 PST</pubDate>
+<link>https://example.com/empty-desc</link>
+<guid>empty-desc-item</guid>
+</item>
+
+<!-- Item with content:encoded instead of description -->
+<item>
+<title>Content Encoded Test</title>
+<content:encoded><![CDATA[
+  <article>
+    <h1>Full Article Content</h1>
+    <p>This uses content:encoded tag instead of description.</p>
+    <p>With some <strong>formatting</strong> and <a href="https://example.com">links</a>.</p>
+  </article>
+]]></content:encoded>
+<pubDate>Sun, 29 Sep 2024 18:45:00 GMT</pubDate>
+<link>https://example.com/content-encoded</link>
+<guid>content-encoded-item</guid>
+</item>
+
+<!-- Item with dc:date namespace -->
+<item>
+<title>DC Date Namespace Test</title>
+<description>Testing dc:date format</description>
+<dc:date>2024-09-28T14:00:00Z</dc:date>
+<link>https://example.com/dc-date</link>
+<guid>dc-date-item</guid>
+</item>
+
+<!-- Item with numeric character entities -->
+<item>
+<title>Test &#8220;smartquotes&#8221; and &#8211;dashes&#8212;</title>
+<description>Body with &#x2022; bullet point and &#xA9; copyright</description>
+<pubDate>Fri, 27 Sep 2024 11:00:00 UTC</pubDate>
+<link>https://example.com/numeric-entities</link>
+<guid>numeric-entities-item</guid>
+</item>
+
+<!-- Item with spaces in GUID -->
+<item>
+<title>Whitespace GUID Test</title>
+<description>GUID has leading/trailing whitespace</description>
+<pubDate>Thu, 26 Sep 2024 08:30:00 GMT</pubDate>
+<link>https://example.com/whitespace-guid</link>
+<guid>  spaced-guid-123  </guid>
+</item>
+
+<!-- Item with very long description -->
+<item>
+<title>Long Description Test</title>
+<description>
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris. Integer in mauris eu nibh euismod gravida. Duis ac tellus et risus vulputate vehicula. Donec lobortis risus a elit. Etiam tempor. Ut ullamcorper, ligula eu tempor congue, eros est euismod turpis, id tincidunt sapien risus a quam. Maecenas fermentum consequat mi.
+</description>
+<pubDate>Wed, 25 Sep 2024 16:00:00 GMT</pubDate>
+<link>https://example.com/long-description</link>
+<guid>long-desc-item</guid>
+</item>
+
+</channel>
+</rss>
