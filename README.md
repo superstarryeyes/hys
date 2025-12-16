@@ -61,7 +61,7 @@ hys
   - macOS: Pre-installed (no action needed)
   - Ubuntu/Debian: `sudo apt-get install libcurl4-openssl-dev`
   - Fedora: `sudo dnf install libcurl-devel`
-  - Arch: `sudo pacman -S libcurl`
+  - Arch: `sudo pacman -S curl`
   - Windows: `choco install curl` (using Chocolatey) or `vcpkg install curl:x64-windows`
 
 ### Build from Source
