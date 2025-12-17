@@ -1,6 +1,6 @@
 .{
     .name = .app,
-    .version = "0.1.0",
+    .version = "0.1.1",
     .dependencies = .{
         .libexpat = .{
             .url = "git+https://github.com/allyourcodebase/libexpat.git?ref=2.7.1-1#472c1db660c813a952f235cb394f5997d2e83fe1",

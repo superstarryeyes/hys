@@ -92,7 +92,7 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
     var cli = CliParser.init(allocator, args);
 
     if (cli.hasArg("--version") or cli.hasArg("-v")) {
-        try stdout.print("hys 0.1.0\n", .{});
+        try stdout.print("hys 0.1.1\n", .{});
         return;
     }
 

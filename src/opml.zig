@@ -77,7 +77,7 @@ pub const OpmlManager = struct {
             if (curl.curl_easy_setopt(handle, curl.CURLOPT_CONNECTTIMEOUT, @as(c_long, 10)) != curl.CURLE_OK) break :blk false;
             if (curl.curl_easy_setopt(handle, curl.CURLOPT_TIMEOUT, @as(c_long, 30)) != curl.CURLE_OK) break :blk false;
             if (curl.curl_easy_setopt(handle, curl.CURLOPT_ACCEPT_ENCODING, "") != curl.CURLE_OK) break :blk false;
-            if (curl.curl_easy_setopt(handle, curl.CURLOPT_USERAGENT, "hys-rss/0.1.0") != curl.CURLE_OK) break :blk false;
+            if (curl.curl_easy_setopt(handle, curl.CURLOPT_USERAGENT, "hys-rss/0.1.1") != curl.CURLE_OK) break :blk false;
             break :blk true;
         };
 
@@ -132,7 +132,7 @@ pub const OpmlManager = struct {
         // Sanitize XML content (fix unescaped ampersands)
         const content = try self.sanitizeXmlContent(raw_content);
         defer self.allocator.free(content);
-        
+
         // Skip leading whitespace before XML declaration
         const trimmed_content = std.mem.trimLeft(u8, content, " \t\n\r");
 
@@ -214,7 +214,7 @@ pub const OpmlManager = struct {
         // Sanitize XML content (fix unescaped ampersands)
         const content = try self.sanitizeXmlContent(raw_content);
         defer self.allocator.free(content);
-        
+
         // Skip leading whitespace before XML declaration
         const trimmed_content = std.mem.trimLeft(u8, content, " \t\n\r");
 

@@ -201,7 +201,7 @@ pub const RssReader = struct {
         if (!looksLikeXml(xml_data)) {
             return error.NetworkError;
         }
-        
+
         // Reset arena from any previous use
         self.resetArena();
 
@@ -264,34 +264,34 @@ pub const RssReader = struct {
     /// Quick check if content looks like XML/feed data before attempting full parse
     fn looksLikeXml(content: []const u8) bool {
         if (content.len == 0) return false;
-        
+
         // Skip UTF-8 BOM if present
         var start: usize = 0;
         if (content.len >= 3 and content[0] == 0xEF and content[1] == 0xBB and content[2] == 0xBF) {
             start = 3;
         }
-        
+
         // Skip whitespace
         while (start < content.len and std.ascii.isWhitespace(content[start])) {
             start += 1;
         }
-        
+
         if (start >= content.len) return false;
-        
+
         // Must start with < (XML declaration or root element)
         if (content[start] != '<') {
             return false;
         }
-        
+
         // Look for common feed tags within first 1KB to avoid scanning large HTML documents
         const scan_limit = @min(content.len, 1024);
         const scan_slice = content[0..scan_limit];
-        
+
         // Check for known feed/RSS/Atom indicators
         return std.mem.indexOfAny(u8, scan_slice, "<rss") != null or
-               std.mem.indexOfAny(u8, scan_slice, "<feed") != null or
-               std.mem.indexOfAny(u8, scan_slice, "<RDF") != null or
-               std.mem.indexOfAny(u8, scan_slice, "<?xml") != null;
+            std.mem.indexOfAny(u8, scan_slice, "<feed") != null or
+            std.mem.indexOfAny(u8, scan_slice, "<RDF") != null or
+            std.mem.indexOfAny(u8, scan_slice, "<?xml") != null;
     }
 
     // --- State Management ---
@@ -1195,18 +1195,18 @@ pub const RssReader = struct {
         const ctx: *CurlWriteContext = @ptrCast(@alignCast(ptr));
         const total_size: usize = size * nmemb;
         const line = data[0..total_size];
-        
+
         // Look for Content-Type header
         if (std.ascii.startsWithIgnoreCase(line, "content-type:")) {
             const trimmed = std.mem.trim(u8, line, " \r\n\t");
             if (std.mem.indexOf(u8, trimmed, ":")) |colon_idx| {
-                const ct_value = std.mem.trim(u8, trimmed[colon_idx + 1..], " ");
+                const ct_value = std.mem.trim(u8, trimmed[colon_idx + 1 ..], " ");
                 ctx.content_type_buffer.clearRetainingCapacity();
                 ctx.content_type_buffer.appendSlice(ct_value) catch {};
                 ctx.content_type = ctx.content_type_buffer.items;
             }
         }
-        
+
         return total_size;
     }
 
@@ -1242,7 +1242,7 @@ pub const RssReader = struct {
 
         var response_buffer = std.array_list.Managed(u8).init(allocator);
         defer response_buffer.deinit();
-        
+
         var content_type_buffer = std.array_list.Managed(u8).init(allocator);
         defer content_type_buffer.deinit();
 
@@ -1264,7 +1264,7 @@ pub const RssReader = struct {
             if (curl.curl_easy_setopt(handle, curl.CURLOPT_CONNECTTIMEOUT, @as(c_long, 5)) != curl.CURLE_OK) break :blk false;
             if (curl.curl_easy_setopt(handle, curl.CURLOPT_TIMEOUT, @as(c_long, 30)) != curl.CURLE_OK) break :blk false;
             if (curl.curl_easy_setopt(handle, curl.CURLOPT_ACCEPT_ENCODING, "") != curl.CURLE_OK) break :blk false;
-            if (curl.curl_easy_setopt(handle, curl.CURLOPT_USERAGENT, "hys-rss/0.1.0") != curl.CURLE_OK) break :blk false;
+            if (curl.curl_easy_setopt(handle, curl.CURLOPT_USERAGENT, "hys-rss/0.1.1") != curl.CURLE_OK) break :blk false;
             break :blk true;
         };
 
@@ -1317,15 +1317,15 @@ pub const RssReader = struct {
             ct_lower[i] = lower(byte);
         }
         const ct_check = ct_lower[0..content_type.len];
-        
+
         // Valid content types for RSS/Atom feeds
         return std.mem.startsWith(u8, ct_check, "application/rss") or
-               std.mem.startsWith(u8, ct_check, "application/atom") or
-               std.mem.startsWith(u8, ct_check, "application/xml") or
-               std.mem.startsWith(u8, ct_check, "application/json") or // JSON Feed
-               std.mem.startsWith(u8, ct_check, "text/xml") or
-               std.mem.startsWith(u8, ct_check, "text/rss") or
-               std.mem.startsWith(u8, ct_check, "text/atom");
+            std.mem.startsWith(u8, ct_check, "application/atom") or
+            std.mem.startsWith(u8, ct_check, "application/xml") or
+            std.mem.startsWith(u8, ct_check, "application/json") or // JSON Feed
+            std.mem.startsWith(u8, ct_check, "text/xml") or
+            std.mem.startsWith(u8, ct_check, "text/rss") or
+            std.mem.startsWith(u8, ct_check, "text/atom");
     }
 
     fn truncateAtLastCompleteItem(self: *RssReader, content: []u8) RssReaderError![]u8 {
