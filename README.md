@@ -135,6 +135,8 @@ hys https://example.com/rss.xml
 
 | **Action** | **Command** |
 | :--- | :--- |
+| Display help with all available flags | `hys --help` |
+| Display version information | `hys --version` |
 | Show config file path | `hys --config` |
 | Force-enable pager | `hys --pager` |
 | Disable pager for this run | `hys --no-pager` |
