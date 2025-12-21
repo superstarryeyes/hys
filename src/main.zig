@@ -490,6 +490,7 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
             all_cached_items.deinit();
         }
 
+        var digest_timestamp: i64 = 0;
         for (group_names) |g_name| {
             var group_limiter = try DailyLimiter.init(allocator, g_name, global_config.history.dayStartHour, global_config.history.fetchIntervalDays);
             defer group_limiter.deinit();
@@ -500,6 +501,15 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
                 continue;
             };
             defer state.deinit(allocator);
+
+            // Capture timestamp from the first loaded state
+            if (digest_timestamp == 0) {
+                if (state.timestamp) |ts| {
+                    if (ts > 0) {
+                        digest_timestamp = ts;
+                    }
+                }
+            }
 
             // Get group display name
             const g_display_name = config_manager.getGroupDisplayName(g_name) catch null;
@@ -521,8 +531,8 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
             if (display_manager.output_buffer) |buf| {
                 buf.clearRetainingCapacity();
 
-                // Get current timestamp for the header
-                const timestamp = std.time.timestamp();
+                // Use the timestamp from the loaded state (or current time if not available)
+                const timestamp = if (digest_timestamp > 0) digest_timestamp else std.time.timestamp();
 
                 var combined_title: []u8 = undefined;
                 if (group_names.len == 1) {
