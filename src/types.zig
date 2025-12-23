@@ -301,12 +301,17 @@ pub const RssItem = struct {
 pub const LastRunState = struct {
     timestamp: ?i64 = null,
     items: []const RssItem = &.{},
+    /// Date string from the history filename (YYYY-MM-DD format), used for accurate "days ago" display
+    file_date: ?[]const u8 = null,
 
     pub fn deinit(self: LastRunState, allocator: std.mem.Allocator) void {
         for (self.items) |item| {
             item.deinit(allocator);
         }
         allocator.free(self.items);
+        if (self.file_date) |fd| {
+            allocator.free(fd);
+        }
     }
 };
 

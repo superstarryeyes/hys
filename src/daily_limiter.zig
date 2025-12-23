@@ -100,7 +100,18 @@ pub const DailyLimiter = struct {
 
         const target_file = file_list.items[target_index];
 
-        return try self.loadStateFromDir(history_dir, target_file);
+        // Extract date from filename: {group}_{YYYY-MM-DD}.json
+        const date_start = group_prefix.len;
+        const date_end = target_file.len - 5; // Remove ".json"
+        const file_date = if (date_end > date_start)
+            try self.allocator.dupe(u8, target_file[date_start..date_end])
+        else
+            null;
+        errdefer if (file_date) |fd| self.allocator.free(fd);
+
+        var state = try self.loadStateFromDir(history_dir, target_file);
+        state.file_date = file_date;
+        return state;
     }
 
     fn loadState(self: DailyLimiter) !types.LastRunState {
@@ -413,6 +424,28 @@ pub const DailyLimiter = struct {
             m += 12;
         }
         return 365 * y + @divFloor(y, 4) - @divFloor(y, 100) + @divFloor(y, 400) + @divFloor(153 * m - 457, 5) + day - 306;
+    }
+
+    /// Calculate how many days ago a date string (YYYY-MM-DD) is from today
+    /// Returns the number of days difference (0 = today, 1 = yesterday, etc.)
+    pub fn daysAgoFromDateString(self: DailyLimiter, date_str: []const u8) !i32 {
+        if (date_str.len < 10) return error.InvalidDateFormat;
+
+        // Parse date from string: YYYY-MM-DD
+        const file_year = try std.fmt.parseInt(i32, date_str[0..4], 10);
+        const file_month = try std.fmt.parseInt(i32, date_str[5..7], 10);
+        const file_day = try std.fmt.parseInt(i32, date_str[8..10], 10);
+        const file_rd = dateToRataDie(file_year, file_month, file_day);
+
+        // Get current logical date (accounting for day start hour)
+        var current_buf: [32]u8 = undefined;
+        const current_date_str = try self.formatCurrentLocalDate(&current_buf);
+        const cy = try std.fmt.parseInt(i32, current_date_str[0..4], 10);
+        const cm = try std.fmt.parseInt(i32, current_date_str[5..7], 10);
+        const cd = try std.fmt.parseInt(i32, current_date_str[8..10], 10);
+        const current_rd = dateToRataDie(cy, cm, cd);
+
+        return current_rd - file_rd;
     }
 
     /// Load seen article hashes from persistent binary storage

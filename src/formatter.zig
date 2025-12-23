@@ -243,9 +243,13 @@ pub const Formatter = struct {
         self.writeOutput("\n");
     }
 
-    pub fn printHysDigestHeader(self: *Formatter, group_name: []const u8, timestamp: i64) void {
+    pub fn printHysDigestHeader(self: *Formatter, group_name: []const u8, timestamp: i64, days_ago: ?i32) void {
         // Get relative or formatted date string
-        const date_str = getRelativeOrFormattedDateWithAlloc(self.allocator, timestamp, self.display_config.dateFormat) catch "Unknown Date";
+        // If days_ago is provided, use it directly instead of calculating from timestamp
+        const date_str = if (days_ago) |da|
+            getDaysAgoString(self.allocator, da) catch "Unknown Date"
+        else
+            getRelativeOrFormattedDateWithAlloc(self.allocator, timestamp, self.display_config.dateFormat) catch "Unknown Date";
         defer if (date_str.ptr != "Unknown Date".ptr) self.allocator.free(date_str);
 
         self.writeOutput(config.COLORS.BOLD ++ config.COLORS.CYAN);
@@ -762,6 +766,17 @@ pub const Formatter = struct {
             const year_day = epoch_seconds.getEpochDay().calculateYearDay();
             const month_day = year_day.calculateMonthDay();
             return std.fmt.allocPrint(alloc, "{d:0>4}-{d:0>2}-{d:0>2}", .{ year_day.year, month_day.month.numeric(), month_day.day_index + 1 });
+        }
+    }
+
+    /// Convert a days_ago value to a human-readable string
+    fn getDaysAgoString(alloc: std.mem.Allocator, days_ago: i32) ![]u8 {
+        if (days_ago <= 0) {
+            return alloc.dupe(u8, "today");
+        } else if (days_ago == 1) {
+            return alloc.dupe(u8, "1 day ago");
+        } else {
+            return std.fmt.allocPrint(alloc, "{d} days ago", .{days_ago});
         }
     }
 

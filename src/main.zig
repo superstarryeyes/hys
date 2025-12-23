@@ -491,6 +491,7 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
         }
 
         var digest_timestamp: i64 = 0;
+        var digest_days_ago: ?i32 = null;
         for (group_names) |g_name| {
             var group_limiter = try DailyLimiter.init(allocator, g_name, global_config.history.dayStartHour, global_config.history.fetchIntervalDays);
             defer group_limiter.deinit();
@@ -502,12 +503,16 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
             };
             defer state.deinit(allocator);
 
-            // Capture timestamp from the first loaded state
+            // Capture timestamp and days_ago from the first loaded state
             if (digest_timestamp == 0) {
                 if (state.timestamp) |ts| {
                     if (ts > 0) {
                         digest_timestamp = ts;
                     }
+                }
+                // Calculate days_ago from the file date (more accurate than timestamp)
+                if (state.file_date) |fd| {
+                    digest_days_ago = group_limiter.daysAgoFromDateString(fd) catch null;
                 }
             }
 
@@ -554,7 +559,7 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
                 const display_title = combined_title;
                 defer allocator.free(display_title);
 
-                display_manager.printHysDigestHeader(display_title, timestamp);
+                display_manager.printHysDigestHeader(display_title, timestamp, digest_days_ago);
 
                 try display_manager.printCachedItems(all_cached_items.items);
                 try display_manager.pipeToLess();
@@ -670,7 +675,7 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
                 const display_title = combined_title;
                 defer allocator.free(display_title);
 
-                display_manager.printHysDigestHeader(display_title, timestamp);
+                display_manager.printHysDigestHeader(display_title, timestamp, null);
 
                 if (cached_aggregation.items.len > 0) {
                     try display_manager.printCachedItems(cached_aggregation.items);
@@ -746,7 +751,7 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
                     const display_title = combined_title;
                     defer allocator.free(display_title);
 
-                    display_manager.printHysDigestHeader(display_title, timestamp);
+                    display_manager.printHysDigestHeader(display_title, timestamp, null);
 
                     if (cached_items_for_mixing.items.len > 0) {
                         try display_manager.printCachedItems(cached_items_for_mixing.items);
@@ -1159,7 +1164,7 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
                 const display_title = combined_title;
                 defer allocator.free(display_title);
 
-                display_manager.printHysDigestHeader(display_title, timestamp);
+                display_manager.printHysDigestHeader(display_title, timestamp, null);
             }
 
             if (all_items.items.len == 0) {

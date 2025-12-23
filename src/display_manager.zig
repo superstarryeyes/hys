@@ -58,8 +58,8 @@ pub const DisplayManager = struct {
         self.formatter.printHeader(title);
     }
 
-    pub fn printHysDigestHeader(self: *DisplayManager, group_name: []const u8, timestamp: i64) void {
-        self.formatter.printHysDigestHeader(group_name, timestamp);
+    pub fn printHysDigestHeader(self: *DisplayManager, group_name: []const u8, timestamp: i64, days_ago: ?i32) void {
+        self.formatter.printHysDigestHeader(group_name, timestamp, days_ago);
     }
 
     pub fn printInfo(self: *DisplayManager, msg: []const u8) void {
