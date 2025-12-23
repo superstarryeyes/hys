@@ -45,12 +45,6 @@ pub const DailyLimiter = struct {
         self.allocator.free(self.seen_ids_file);
     }
 
-    pub fn loadDay(self: DailyLimiter, day_offset: i32) !types.LastRunState {
-        const filename = try self.getFilenameForOffset(day_offset);
-        defer self.allocator.free(filename);
-        return try self.loadStateFromFile(filename);
-    }
-
     /// Load history based on chronological fetch order (0 = latest, -1 = previous run, etc.)
     pub fn loadRunByOffset(self: DailyLimiter, offset: i32) !types.LastRunState {
         // 1. Collect all history files for this group
@@ -275,59 +269,6 @@ pub const DailyLimiter = struct {
         const filename_only = try std.fmt.bufPrint(&filename_buf, "{s}_{s}.json", .{ self.group_name, date_str });
 
         return try std.fs.path.join(self.allocator, &.{ self.state_dir, filename_only });
-    }
-
-    fn getFilenameForOffset(self: DailyLimiter, offset: i32) ![]u8 {
-        var local_tz = try zdt.Timezone.tzLocal(self.allocator);
-        defer local_tz.deinit();
-        var now = try zdt.Datetime.now(.{ .tz = &local_tz });
-
-        if (self.day_start_hour > 0) {
-            const hour_offset: i64 = -@as(i64, @intCast(self.day_start_hour));
-            const duration = zdt.Duration.fromTimespanMultiple(hour_offset, .hour);
-            now = try now.add(duration);
-        }
-
-        const day_duration = zdt.Duration.fromTimespanMultiple(@as(i64, offset), .day);
-        const shifted = try now.add(day_duration);
-
-        // Format date on the stack
-        // Use @abs to avoid + sign from zdt positive number formatting
-        var date_buf: [32]u8 = undefined;
-        const date_str = try std.fmt.bufPrint(
-            &date_buf,
-            "{d:0>4}-{d:0>2}-{d:0>2}",
-            .{ @abs(shifted.year), @as(u5, @intCast(shifted.month)), @as(u5, @intCast(shifted.day)) },
-        );
-
-        // Build filename on the stack
-        var filename_buf: [256]u8 = undefined;
-        const filename_only = try std.fmt.bufPrint(&filename_buf, "{s}_{s}.json", .{ self.group_name, date_str });
-
-        return try std.fs.path.join(self.allocator, &.{ self.state_dir, filename_only });
-    }
-
-    pub fn timestampToDateString(self: DailyLimiter, timestamp: i64) ![]u8 {
-        // Convert Unix timestamp to local date string using zdt
-        var dt = try zdt.Datetime.fromUnix(timestamp, .second, null);
-
-        if (self.day_start_hour > 0) {
-            const hour_offset: i64 = -@as(i64, @intCast(self.day_start_hour));
-            const duration = zdt.Duration.fromTimespanMultiple(hour_offset, .hour);
-            dt = try dt.add(duration);
-        }
-
-        // Format as YYYY-MM-DD on the stack first
-        // Use @abs to avoid + sign from zdt positive number formatting
-        var date_buf: [32]u8 = undefined;
-        const date_str = try std.fmt.bufPrint(&date_buf, "{d:0>4}-{d:0>2}-{d:0>2}", .{
-            @abs(dt.year),
-            @as(u5, @intCast(dt.month)),
-            @as(u5, @intCast(dt.day)),
-        });
-
-        // Only allocate when returning if ownership is needed
-        return try self.allocator.dupe(u8, date_str);
     }
 
     pub fn reset(self: DailyLimiter) !void {
