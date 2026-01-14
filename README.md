@@ -30,6 +30,7 @@ Hys is a fast, lightweight, and opinionated terminal RSS reader written in Zig t
 | **🌍 Multilingual Support** | Native support for Chinese, Japanese, Korean, Indic, Cyrillic etc. |
 | **📁 Feed Groups** | Organize your feeds into groups (e.g. `tech`, `science`, `art`) and read them individually or all at once. |
 | **📖 Pager TUI**| Automatically pipes into `less` for a distraction-free reading experience with intuitive vim-style keybindings. |
+| **🤖 AI-Friendly**| Optional plain JSON output for seamless integration with AI agents and LLM workflows. |
 | **🔎 Search** | Find text in your feeds with the search functionality integrated into `less`. |
 | **📰 Universal Feed Support**           | RSS 2.0 and Atom 1.0 with robust parsing, HTML entity decoding, and UTF-8 validation          |
 
@@ -139,6 +140,7 @@ hys https://example.com/rss.xml
 | Show config file path | `hys --config` |
 | Force-enable pager | `hys --pager` |
 | Disable pager for this run | `hys --no-pager` |
+| Output as JSON (no pager) | `hys --json` |
 
 ### Navigation (Pager Mode)
 
