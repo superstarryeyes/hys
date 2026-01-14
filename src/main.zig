@@ -10,6 +10,7 @@ const OpmlManager = @import("opml").OpmlManager;
 const CliParser = @import("cli_parser").CliParser;
 const FeedProcessor = @import("feed_processor").FeedProcessor;
 const DisplayManager = @import("display_manager").DisplayManager;
+const formatter = @import("formatter");
 
 const curl = @cImport({
     @cInclude("curl/curl.h");
@@ -23,6 +24,21 @@ fn hasAnyArg(cli: CliParser, long_name: []const u8, short_name: []const u8) bool
 /// Helper function to get argument value by either long or short name
 fn getAnyArgValue(cli: CliParser, long_name: []const u8, short_name: []const u8) ?[]const u8 {
     return cli.getArgValue(long_name) orelse cli.getArgValue(short_name);
+}
+
+/// Helper to check for JSON mode and output if enabled. Returns true if JSON was output.
+fn tryHandleJsonOutput(
+    allocator: std.mem.Allocator,
+    cli: CliParser,
+    items: []const types.RssItem,
+    failed_feeds: []const []const u8,
+    stdout: *std.io.Writer,
+) !bool {
+    if (hasAnyArg(cli, "--json", "-j")) {
+        try outputJson(allocator, items, failed_feeds, stdout);
+        return true;
+    }
+    return false;
 }
 
 fn runLoadingAnimation(is_loading: *std.atomic.Value(bool), feed_count: usize, stdout: *std.io.Writer) void {
@@ -533,6 +549,8 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
         }
 
         if (all_cached_items.items.len > 0) {
+            if (try tryHandleJsonOutput(allocator, cli, all_cached_items.items, &.{}, stdout)) return;
+
             if (display_manager.output_buffer) |buf| {
                 buf.clearRetainingCapacity();
 
@@ -652,6 +670,8 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
                 }
             }
 
+            if (try tryHandleJsonOutput(allocator, cli, cached_aggregation.items, &.{}, stdout)) return;
+
             // Display cached items
             if (display_manager.output_buffer) |buf| {
                 buf.clearRetainingCapacity();
@@ -727,6 +747,8 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
                     for (cached_items_for_mixing.items) |item| item.deinit(allocator);
                     cached_items_for_mixing.deinit();
                 }
+
+                if (try tryHandleJsonOutput(allocator, cli, cached_items_for_mixing.items, &.{}, stdout)) return;
 
                 // Display cached items and return
                 if (display_manager.output_buffer) |buf| {
@@ -881,11 +903,17 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
 
     const feeds_to_read = aggregated_feeds.items;
 
-    // 1. Create an atomic flag to control the animation loop
-    var is_loading = std.atomic.Value(bool).init(true);
+    // Check if JSON output mode is enabled (suppress loading animation)
+    const json_mode = hasAnyArg(cli, "--json", "-j");
 
-    // 2. Spawn a background thread to handle the visual animation
-    const anim_thread = try std.Thread.spawn(.{}, runLoadingAnimation, .{ &is_loading, feeds_to_read.len, stdout });
+    // 1. Create an atomic flag to control the animation loop
+    var is_loading = std.atomic.Value(bool).init(!json_mode);
+
+    // 2. Spawn a background thread to handle the visual animation (skip in JSON mode)
+    var anim_thread: ?std.Thread = null;
+    if (!json_mode) {
+        anim_thread = try std.Thread.spawn(.{}, runLoadingAnimation, .{ &is_loading, feeds_to_read.len, stdout });
+    }
 
     var seen_articles = limiter.loadSeenHashes() catch |err| blk: {
         display_manager.printError("Failed to load seen articles hash file");
@@ -912,11 +940,12 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
 
     // 4. Signal the animation thread to stop and wait for it to join
     is_loading.store(false, .release);
-    anim_thread.join();
-
-    // Clear the loading animation line completely
-    try stdout.print("\r                                                                                \r", .{});
-    try stdout.flush();
+    if (anim_thread) |thread| {
+        thread.join();
+        // Clear the loading animation line completely
+        try stdout.print("\r                                                                                \r", .{});
+        try stdout.flush();
+    }
 
     defer {
         // processResults takes ownership of feed_config and parsed, so they are cleaned up
@@ -1090,6 +1119,8 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
         };
     }
 
+    if (try tryHandleJsonOutput(allocator, cli, all_items.items, failed_feeds.items, stdout)) return;
+
     // If using streaming pager mode, output is written directly as items are processed
     if (display_manager.use_pager_streaming) {
         if (all_items.items.len == 0) {
@@ -1200,4 +1231,197 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
     }
 
     try stdout.flush();
+}
+
+fn outputJson(allocator: std.mem.Allocator, items: []const types.RssItem, failed_feeds: []const []const u8, stdout: *std.io.Writer) !void {
+    var json_buffer = std.array_list.Managed(u8).init(allocator);
+    defer json_buffer.deinit();
+
+    const writer = json_buffer.writer().any();
+
+    try writer.writeAll("{\n");
+    try writer.writeAll("  \"version\": 1,\n");
+
+    // Write items array
+    try writer.writeAll("  \"items\": [\n");
+
+    // Group items by group -> feed for nested structure
+    var groups_map = std.StringHashMap(std.StringHashMap(std.array_list.Managed(types.RssItem))).init(allocator);
+    defer {
+        var group_it = groups_map.iterator();
+        while (group_it.next()) |group_entry| {
+            var feeds_it = group_entry.value_ptr.iterator();
+            while (feeds_it.next()) |feed_entry| {
+                feed_entry.value_ptr.deinit();
+            }
+            group_entry.value_ptr.deinit();
+        }
+        groups_map.deinit();
+    }
+
+    for (items) |item| {
+        const group_name = item.groupName orelse "main";
+        const feed_name = item.feedName orelse "Unknown Feed";
+
+        const gop = try groups_map.getOrPut(group_name);
+        if (!gop.found_existing) {
+            gop.value_ptr.* = std.StringHashMap(std.array_list.Managed(types.RssItem)).init(allocator);
+        }
+
+        const fop = try gop.value_ptr.getOrPut(feed_name);
+        if (!fop.found_existing) {
+            fop.value_ptr.* = std.array_list.Managed(types.RssItem).init(allocator);
+        }
+
+        try fop.value_ptr.append(item);
+    }
+
+    // Sort group names for deterministic output
+    var sorted_groups = std.array_list.Managed([]const u8).init(allocator);
+    defer sorted_groups.deinit();
+    var group_key_it = groups_map.keyIterator();
+    while (group_key_it.next()) |key| try sorted_groups.append(key.*);
+    std.mem.sort([]const u8, sorted_groups.items, {}, struct {
+        fn less(_: void, a: []const u8, b: []const u8) bool {
+            return std.mem.order(u8, a, b) == .lt;
+        }
+    }.less);
+
+    for (sorted_groups.items, 0..) |group_name, group_idx| {
+        if (group_idx > 0) try writer.writeAll(",\n");
+
+        const group_entry = groups_map.getPtr(group_name).?;
+
+        try writer.writeAll("    {\n");
+        try writer.writeAll("      \"group\": \"");
+        try formatter.writeJsonEscaped(writer, group_name);
+        try writer.writeAll("\",\n");
+
+        // Get group display name from first item
+        var display_name: ?[]const u8 = null;
+        var feeds_peek = group_entry.iterator();
+        if (feeds_peek.next()) |feed_entry| {
+            if (feed_entry.value_ptr.items.len > 0) {
+                display_name = feed_entry.value_ptr.items[0].groupDisplayName;
+            }
+        }
+        if (display_name) |dn| {
+            try writer.writeAll("      \"groupDisplayName\": \"");
+            try formatter.writeJsonEscaped(writer, dn);
+            try writer.writeAll("\",\n");
+        }
+
+        try writer.writeAll("      \"feeds\": [\n");
+
+        // Sort feed names for deterministic output
+        var sorted_feeds = std.array_list.Managed([]const u8).init(allocator);
+        defer sorted_feeds.deinit();
+        var feed_key_it = group_entry.keyIterator();
+        while (feed_key_it.next()) |key| try sorted_feeds.append(key.*);
+        std.mem.sort([]const u8, sorted_feeds.items, {}, struct {
+            fn less(_: void, a: []const u8, b: []const u8) bool {
+                return std.mem.order(u8, a, b) == .lt;
+            }
+        }.less);
+
+        for (sorted_feeds.items, 0..) |feed_name, feed_idx| {
+            if (feed_idx > 0) try writer.writeAll(",\n");
+
+            const feed_items_list = group_entry.getPtr(feed_name).?;
+
+            try writer.writeAll("        {\n");
+            try writer.writeAll("          \"name\": \"");
+            try formatter.writeJsonEscaped(writer, feed_name);
+            try writer.writeAll("\",\n");
+            try writer.writeAll("          \"items\": [\n");
+
+            for (feed_items_list.items, 0..) |item, item_idx| {
+                if (item_idx > 0) try writer.writeAll(",\n");
+                try writer.writeAll("            {\n");
+
+                // Title
+                try writer.writeAll("              \"title\": ");
+                if (item.title) |t| {
+                    try writer.writeAll("\"");
+                    try formatter.writeJsonEscaped(writer, t);
+                    try writer.writeAll("\"");
+                } else {
+                    try writer.writeAll("null");
+                }
+                try writer.writeAll(",\n");
+
+                // Link
+                try writer.writeAll("              \"link\": ");
+                if (item.link) |l| {
+                    try writer.writeAll("\"");
+                    try formatter.writeJsonEscaped(writer, l);
+                    try writer.writeAll("\"");
+                } else {
+                    try writer.writeAll("null");
+                }
+                try writer.writeAll(",\n");
+
+                // Description
+                try writer.writeAll("              \"description\": ");
+                if (item.description) |d| {
+                    try writer.writeAll("\"");
+                    try formatter.writeJsonEscaped(writer, d);
+                    try writer.writeAll("\"");
+                } else {
+                    try writer.writeAll("null");
+                }
+                try writer.writeAll(",\n");
+
+                // Publish Date
+                try writer.writeAll("              \"pubDate\": ");
+                if (item.pubDate) |p| {
+                    try writer.writeAll("\"");
+                    try formatter.writeJsonEscaped(writer, p);
+                    try writer.writeAll("\"");
+                } else {
+                    try writer.writeAll("null");
+                }
+                try writer.writeAll(",\n");
+
+                // Timestamp
+                try writer.print("              \"timestamp\": {d},\n", .{item.timestamp});
+
+                // GUID
+                try writer.writeAll("              \"guid\": ");
+                if (item.guid) |g| {
+                    try writer.writeAll("\"");
+                    try formatter.writeJsonEscaped(writer, g);
+                    try writer.writeAll("\"");
+                } else {
+                    try writer.writeAll("null");
+                }
+
+                try writer.writeAll("\n            }");
+            }
+
+            try writer.writeAll("\n          ]\n        }");
+        }
+
+        try writer.writeAll("\n      ]\n    }");
+    }
+
+    try writer.writeAll("\n  ],\n");
+
+    // Write failed feeds array
+    try writer.writeAll("  \"failedFeeds\": [");
+    for (failed_feeds, 0..) |name, i| {
+        if (i > 0) try writer.writeAll(", ");
+        try writer.writeAll("\"");
+        try formatter.writeJsonEscaped(writer, name);
+        try writer.writeAll("\"");
+    }
+    try writer.writeAll("],\n");
+
+    // Write metadata
+    try writer.print("  \"itemCount\": {d},\n", .{items.len});
+    try writer.print("  \"failedCount\": {d}\n", .{failed_feeds.len});
+
+    try writer.writeAll("}\n");
+
+    try stdout.writeAll(json_buffer.items);
 }

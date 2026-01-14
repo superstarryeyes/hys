@@ -14,6 +14,7 @@ const valid_flags_map = std.StaticStringMap(void).initComptime(.{
     .{ "--pager", {} },   .{ "--no-pager", {} },
     .{ "--all", {} },     .{ "-a", {} },
     .{ "--day", {} },     .{ "-d", {} },
+    .{ "--json", {} },    .{ "-j", {} },
 });
 
 const flags_with_values_map = std.StaticStringMap(void).initComptime(.{
@@ -239,6 +240,7 @@ pub const CliParser = struct {
             \\    -n, --name <NAME>             Set display name for current group
             \\    -r, --reset                   Reset daily limit
             \\    --pager / --no-pager          Force enable/disable pager
+            \\    -j, --json                    Output in JSON format (no pager)
             \\
             \\EXAMPLES:
             \\    hys                           Check feeds from main group

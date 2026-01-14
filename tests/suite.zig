@@ -394,6 +394,90 @@ test "Unicode in feed name" {
 }
 
 // ============================================================================
+// JSON OUTPUT TESTS
+// ============================================================================
+
+test "writeJsonEscaped escapes quotes" {
+    const allocator = std.testing.allocator;
+    var buffer = std.array_list.Managed(u8).init(allocator);
+    defer buffer.deinit();
+    const writer = buffer.writer().any();
+
+    try formatter.writeJsonEscaped(writer, "Hello \"World\"");
+    try std.testing.expectEqualStrings("Hello \\\"World\\\"", buffer.items);
+}
+
+test "writeJsonEscaped escapes backslashes" {
+    const allocator = std.testing.allocator;
+    var buffer = std.array_list.Managed(u8).init(allocator);
+    defer buffer.deinit();
+    const writer = buffer.writer().any();
+
+    try formatter.writeJsonEscaped(writer, "path\\to\\file");
+    try std.testing.expectEqualStrings("path\\\\to\\\\file", buffer.items);
+}
+
+test "writeJsonEscaped escapes newlines and tabs" {
+    const allocator = std.testing.allocator;
+    var buffer = std.array_list.Managed(u8).init(allocator);
+    defer buffer.deinit();
+    const writer = buffer.writer().any();
+
+    try formatter.writeJsonEscaped(writer, "line1\nline2\ttab");
+    try std.testing.expectEqualStrings("line1\\nline2\\ttab", buffer.items);
+}
+
+test "writeJsonEscaped strips ANSI CSI sequences" {
+    const allocator = std.testing.allocator;
+    var buffer = std.array_list.Managed(u8).init(allocator);
+    defer buffer.deinit();
+    const writer = buffer.writer().any();
+
+    try formatter.writeJsonEscaped(writer, "\x1b[33mYellow\x1b[0m Text");
+    try std.testing.expectEqualStrings("Yellow Text", buffer.items);
+}
+
+test "writeJsonEscaped strips ANSI OSC hyperlink sequences" {
+    const allocator = std.testing.allocator;
+    var buffer = std.array_list.Managed(u8).init(allocator);
+    defer buffer.deinit();
+    const writer = buffer.writer().any();
+
+    try formatter.writeJsonEscaped(writer, "\x1b]8;;https://example.com\x1b\\Link Text\x1b]8;;\x1b\\");
+    try std.testing.expectEqualStrings("Link Text", buffer.items);
+}
+
+test "writeJsonEscaped handles mixed content" {
+    const allocator = std.testing.allocator;
+    var buffer = std.array_list.Managed(u8).init(allocator);
+    defer buffer.deinit();
+    const writer = buffer.writer().any();
+
+    try formatter.writeJsonEscaped(writer, "Title: \"Test\"\n\x1b[1mBold\x1b[0m");
+    try std.testing.expectEqualStrings("Title: \\\"Test\\\"\\nBold", buffer.items);
+}
+
+test "writeJsonEscaped preserves unicode" {
+    const allocator = std.testing.allocator;
+    var buffer = std.array_list.Managed(u8).init(allocator);
+    defer buffer.deinit();
+    const writer = buffer.writer().any();
+
+    try formatter.writeJsonEscaped(writer, "日本語 🚀 emoji");
+    try std.testing.expectEqualStrings("日本語 🚀 emoji", buffer.items);
+}
+
+test "writeJsonEscaped escapes control characters" {
+    const allocator = std.testing.allocator;
+    var buffer = std.array_list.Managed(u8).init(allocator);
+    defer buffer.deinit();
+    const writer = buffer.writer().any();
+
+    try formatter.writeJsonEscaped(writer, "null\x00char");
+    try std.testing.expectEqualStrings("null\\u0000char", buffer.items);
+}
+
+// ============================================================================
 // TEST SUMMARY
 // ============================================================================
 

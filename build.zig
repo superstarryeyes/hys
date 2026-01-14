@@ -121,6 +121,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("cli_parser", cli_parser_mod);
     exe.root_module.addImport("feed_processor", feed_processor_mod);
     exe.root_module.addImport("display_manager", display_manager_mod);
+    exe.root_module.addImport("formatter", formatter_mod);
 
     // Link Expat to the executable
     exe.linkLibrary(expat_dep.artifact("expat"));

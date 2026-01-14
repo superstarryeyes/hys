@@ -38,6 +38,51 @@ pub fn getCodepointDisplayWidth(cp: u21) usize {
     return 1;
 }
 
+/// Escapes a string for safe JSON output, stripping ANSI escape sequences.
+/// Handles malformed ANSI sequences safely without buffer overruns.
+pub fn writeJsonEscaped(writer: std.io.AnyWriter, str: []const u8) !void {
+    var i: usize = 0;
+    while (i < str.len) {
+        const c = str[i];
+        // Skip ANSI escape sequences (ESC [ ... m or ESC ] ... \)
+        if (c == 0x1b and i + 1 < str.len) {
+            const next = str[i + 1];
+            if (next == '[') {
+                // CSI sequence: ESC [ ... m
+                i += 2;
+                // Safety: break if we hit end of string (malformed sequence)
+                while (i < str.len and str[i] != 'm') : (i += 1) {}
+                if (i < str.len) i += 1; // Skip the 'm' if we found it
+                continue;
+            } else if (next == ']') {
+                // OSC sequence: ESC ] ... (ESC \ or BEL)
+                i += 2;
+                while (i < str.len) : (i += 1) {
+                    if (str[i] == 0x07) {
+                        i += 1;
+                        break;
+                    } // BEL
+                    if (str[i] == 0x1b and i + 1 < str.len and str[i + 1] == '\\') {
+                        i += 2;
+                        break;
+                    }
+                }
+                continue;
+            }
+        }
+        switch (c) {
+            '"' => try writer.writeAll("\\\""),
+            '\\' => try writer.writeAll("\\\\"),
+            '\n' => try writer.writeAll("\\n"),
+            '\r' => try writer.writeAll("\\r"),
+            '\t' => try writer.writeAll("\\t"),
+            0x00...0x08, 0x0b, 0x0c, 0x0e...0x1f => try writer.print("\\u{x:0>4}", .{c}),
+            else => try writer.writeByte(c),
+        }
+        i += 1;
+    }
+}
+
 pub const Formatter = struct {
     allocator: std.mem.Allocator,
     display_config: types.DisplayConfig,
