@@ -1,5 +1,6 @@
 const std = @import("std");
 const types = @import("types");
+const DailyLimiter = @import("daily_limiter").DailyLimiter;
 
 // Test suite for filesystem-related operations (DailyLimiter, history, seen hashes)
 // Run with: zig build test-filesystem
@@ -135,4 +136,185 @@ test "append hashes" {
     var h = try lim.loadSeenHashes();
     defer h.deinit();
     try std.testing.expectEqual(@as(u32, 2), h.count());
+}
+
+test "pruneSeen rewrites file without crashing" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const lim = try TestLimiter.init(std.testing.allocator, tmp.dir);
+    defer lim.deinit();
+
+    var limiter = DailyLimiter{
+        .allocator = std.testing.allocator,
+        .state_dir = try std.testing.allocator.dupe(u8, lim.state_dir),
+        .seen_ids_file = try std.testing.allocator.dupe(u8, lim.seen_ids_file),
+        .group_name = "test",
+        .day_start_hour = 0,
+        .fetch_interval_days = 1,
+    };
+    defer limiter.deinit();
+
+    // Seed the file with an old entry and a newer entry. Pruning should remove the old one
+    // and rewrite the file (this used to trigger a double-close panic).
+    {
+        const file = try std.fs.cwd().createFile(lim.seen_ids_file, .{});
+        defer file.close();
+
+        const now_i64 = std.time.timestamp();
+        const now_u64: u64 = if (now_i64 < 0) 0 else @intCast(now_i64);
+
+        const old_u64 = if (now_u64 > 2 * 24 * 60 * 60) now_u64 - (2 * 24 * 60 * 60) else 0;
+        const old_ts: u32 = @truncate(old_u64);
+        const new_u64 = @min(now_u64 + 60 * 60, std.math.maxInt(u32));
+        const new_ts: u32 = @truncate(new_u64);
+
+        var buf: [12]u8 = undefined;
+        std.mem.writeInt(u32, buf[0..4], old_ts, .little);
+        std.mem.writeInt(u64, buf[4..12], 0x1111, .little);
+        try file.writeAll(&buf);
+
+        std.mem.writeInt(u32, buf[0..4], new_ts, .little);
+        std.mem.writeInt(u64, buf[4..12], 0x2222, .little);
+        try file.writeAll(&buf);
+    }
+
+    try limiter.pruneSeen(1);
+
+    const file = try std.fs.cwd().openFile(lim.seen_ids_file, .{});
+    defer file.close();
+    try std.testing.expectEqual(@as(u64, 12), try file.getEndPos());
+    try file.seekTo(0);
+    var buf: [12]u8 = undefined;
+    try std.testing.expectEqual(@as(usize, 12), try file.readAll(&buf));
+    try std.testing.expectEqual(@as(u64, 0x2222), std.mem.readInt(u64, buf[4..12], .little));
+}
+
+test "loadSeenHashes resets corrupted file without crashing" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const lim = try TestLimiter.init(std.testing.allocator, tmp.dir);
+    defer lim.deinit();
+
+    var limiter = DailyLimiter{
+        .allocator = std.testing.allocator,
+        .state_dir = try std.testing.allocator.dupe(u8, lim.state_dir),
+        .seen_ids_file = try std.testing.allocator.dupe(u8, lim.seen_ids_file),
+        .group_name = "test",
+        .day_start_hour = 0,
+        .fetch_interval_days = 1,
+    };
+    defer limiter.deinit();
+
+    {
+        const file = try std.fs.cwd().createFile(lim.seen_ids_file, .{});
+        defer file.close();
+        try file.writeAll("x"); // not a multiple of 12 bytes
+    }
+
+    var hashes = try limiter.loadSeenHashes();
+    defer hashes.deinit();
+    try std.testing.expectEqual(@as(u32, 0), hashes.count());
+
+    try std.testing.expectError(error.FileNotFound, std.fs.cwd().access(lim.seen_ids_file, .{}));
+}
+
+test "pruneSeen deletes corrupted file" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const lim = try TestLimiter.init(std.testing.allocator, tmp.dir);
+    defer lim.deinit();
+
+    var limiter = DailyLimiter{
+        .allocator = std.testing.allocator,
+        .state_dir = try std.testing.allocator.dupe(u8, lim.state_dir),
+        .seen_ids_file = try std.testing.allocator.dupe(u8, lim.seen_ids_file),
+        .group_name = "test",
+        .day_start_hour = 0,
+        .fetch_interval_days = 1,
+    };
+    defer limiter.deinit();
+
+    {
+        const file = try std.fs.cwd().createFile(lim.seen_ids_file, .{});
+        defer file.close();
+        try file.writeAll("corruptdata!x");
+    }
+
+    try limiter.pruneSeen(1);
+
+    try std.testing.expectError(error.FileNotFound, std.fs.cwd().access(lim.seen_ids_file, .{}));
+}
+
+test "pruneSeen no-op when all entries retained" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const lim = try TestLimiter.init(std.testing.allocator, tmp.dir);
+    defer lim.deinit();
+
+    var limiter = DailyLimiter{
+        .allocator = std.testing.allocator,
+        .state_dir = try std.testing.allocator.dupe(u8, lim.state_dir),
+        .seen_ids_file = try std.testing.allocator.dupe(u8, lim.seen_ids_file),
+        .group_name = "test",
+        .day_start_hour = 0,
+        .fetch_interval_days = 1,
+    };
+    defer limiter.deinit();
+
+    {
+        const file = try std.fs.cwd().createFile(lim.seen_ids_file, .{});
+        defer file.close();
+
+        const now_i64 = std.time.timestamp();
+        const now_u64: u64 = if (now_i64 < 0) 0 else @intCast(now_i64);
+        const ts: u32 = @intCast(@min(now_u64, std.math.maxInt(u32)));
+
+        var buf: [12]u8 = undefined;
+        std.mem.writeInt(u32, buf[0..4], ts, .little);
+        std.mem.writeInt(u64, buf[4..12], 0xAAAA, .little);
+        try file.writeAll(&buf);
+    }
+
+    try limiter.pruneSeen(30);
+
+    const file = try std.fs.cwd().openFile(lim.seen_ids_file, .{});
+    defer file.close();
+    try std.testing.expectEqual(@as(u64, 12), try file.getEndPos());
+    try file.seekTo(0);
+    var buf: [12]u8 = undefined;
+    try std.testing.expectEqual(@as(usize, 12), try file.readAll(&buf));
+    try std.testing.expectEqual(@as(u64, 0xAAAA), std.mem.readInt(u64, buf[4..12], .little));
+}
+
+test "pruneSeen produces empty file when all entries expired" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const lim = try TestLimiter.init(std.testing.allocator, tmp.dir);
+    defer lim.deinit();
+
+    var limiter = DailyLimiter{
+        .allocator = std.testing.allocator,
+        .state_dir = try std.testing.allocator.dupe(u8, lim.state_dir),
+        .seen_ids_file = try std.testing.allocator.dupe(u8, lim.seen_ids_file),
+        .group_name = "test",
+        .day_start_hour = 0,
+        .fetch_interval_days = 1,
+    };
+    defer limiter.deinit();
+
+    {
+        const file = try std.fs.cwd().createFile(lim.seen_ids_file, .{});
+        defer file.close();
+
+        var buf: [12]u8 = undefined;
+        std.mem.writeInt(u32, buf[0..4], 1, .little);
+        std.mem.writeInt(u64, buf[4..12], 0xBBBB, .little);
+        try file.writeAll(&buf);
+    }
+
+    try limiter.pruneSeen(1);
+
+    const file = try std.fs.cwd().openFile(lim.seen_ids_file, .{});
+    defer file.close();
+    try std.testing.expectEqual(@as(u64, 0), try file.getEndPos());
 }

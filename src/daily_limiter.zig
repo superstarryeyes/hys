@@ -4,6 +4,8 @@ const types = @import("types");
 const RssReader = @import("rss_reader").RssReader;
 
 pub const DailyLimiter = struct {
+    const entry_size: usize = 12;
+
     allocator: std.mem.Allocator,
     /// Directory path where daily state files are stored (e.g., ~/.hys/history)
     state_dir: []u8,
@@ -395,37 +397,41 @@ pub const DailyLimiter = struct {
     pub fn loadSeenHashes(self: DailyLimiter) !std.AutoHashMap(u64, void) {
         var seen_hashes = std.AutoHashMap(u64, void).init(self.allocator);
 
-        const file = std.fs.cwd().openFile(self.seen_ids_file, .{}) catch |err| switch (err) {
-            error.FileNotFound => return seen_hashes, // Return empty map if file doesn't exist
-            else => return err,
+        var file_size: u64 = 0;
+        var entry_count: u64 = 0;
+        const is_corrupted = blk: {
+            const file = std.fs.cwd().openFile(self.seen_ids_file, .{}) catch |err| switch (err) {
+                error.FileNotFound => return seen_hashes,
+                else => return err,
+            };
+            defer file.close();
+
+            file_size = try file.getEndPos();
+            if (file_size == 0) return seen_hashes;
+
+            entry_count = file_size / entry_size;
+            if (file_size % entry_size != 0) {
+                std.log.warn("Deduplication file corrupted. Resetting.", .{});
+                break :blk true;
+            }
+
+            try seen_hashes.ensureTotalCapacity(@intCast(entry_count));
+
+            var i: usize = 0;
+            while (i < entry_count) : (i += 1) {
+                var entry_bytes: [entry_size]u8 = undefined;
+                const bytes_read = try file.readAll(&entry_bytes);
+                if (bytes_read < entry_size) return error.UnexpectedEof;
+
+                const hash = std.mem.readInt(u64, entry_bytes[4..12], .little);
+                seen_hashes.putAssumeCapacity(hash, {});
+            }
+
+            break :blk false;
         };
-        defer file.close();
 
-        const file_size = try file.getEndPos();
-        if (file_size == 0) return seen_hashes;
-
-        // File should contain (timestamp + hash) pairs: 4 + 8 = 12 bytes each
-        const entry_size = 4 + 8; // u32 + u64
-        const entry_count = file_size / entry_size;
-        if (file_size % entry_size != 0) {
-            // Reset the file if corrupted, otherwise it stays corrupted forever
-            std.debug.print("Warning: Deduplication file corrupted. Resetting.\n", .{});
-            file.close();
-            try std.fs.cwd().deleteFile(self.seen_ids_file);
-            return seen_hashes;
-        }
-
-        try seen_hashes.ensureTotalCapacity(@intCast(entry_count));
-
-        var i: usize = 0;
-        while (i < entry_count) : (i += 1) {
-            var entry_bytes: [12]u8 = undefined;
-            const bytes_read = try file.readAll(&entry_bytes);
-            if (bytes_read < 12) break; // EOF or incomplete read
-
-            // Skip timestamp (first 4 bytes), extract hash (next 8 bytes)
-            const hash = std.mem.readInt(u64, entry_bytes[4..12], .little);
-            seen_hashes.putAssumeCapacity(hash, {});
+        if (is_corrupted) {
+            std.fs.cwd().deleteFile(self.seen_ids_file) catch {};
         }
 
         return seen_hashes;
@@ -539,63 +545,70 @@ pub const DailyLimiter = struct {
     /// File format: entries of (u32 timestamp | u64 hash) = 12 bytes each
     /// Only keeps entries newer than (now - retention_days)
     pub fn pruneSeen(self: DailyLimiter, retention_days: u32) !void {
-        const file = std.fs.cwd().openFile(self.seen_ids_file, .{}) catch |err| switch (err) {
-            error.FileNotFound => return, // File doesn't exist, nothing to prune
-            else => return err,
-        };
-        defer file.close();
-
-        const file_size = try file.getEndPos();
-        if (file_size == 0) return; // Empty file, nothing to prune
-
-        // File should contain (timestamp + hash) pairs: 4 + 8 = 12 bytes each
-        const entry_size = 4 + 8; // u32 + u64
-        const entry_count = file_size / entry_size;
-        if (file_size % entry_size != 0) {
-            // File is corrupted, delete it to reset
-            try std.fs.cwd().deleteFile(self.seen_ids_file);
-            return;
-        }
-
-        // Calculate cutoff timestamp (current time - retention_days)
-        const now_timestamp = @as(u64, @intCast(std.time.timestamp()));
-        const retention_seconds = @as(u64, retention_days) * 24 * 60 * 60;
-        const cutoff_timestamp = if (now_timestamp > retention_seconds)
-            @as(u32, @truncate(now_timestamp - retention_seconds))
-        else
-            0; // If retention_seconds is larger than now_timestamp, keep everything
-
-        // Read all entries and filter
-        var valid_entries = std.array_list.Managed([12]u8).init(self.allocator);
+        var valid_entries = std.array_list.Managed([entry_size]u8).init(self.allocator);
         defer valid_entries.deinit();
 
-        try file.seekTo(0);
-        var i: usize = 0;
-        while (i < entry_count) : (i += 1) {
-            var entry_bytes: [12]u8 = undefined;
-            const bytes_read = try file.readAll(&entry_bytes);
-            if (bytes_read < 12) break; // EOF or incomplete read
+        var should_rewrite = false;
+        const read_result = blk: {
+            const file = std.fs.cwd().openFile(self.seen_ids_file, .{}) catch |err| switch (err) {
+                error.FileNotFound => return,
+                else => return err,
+            };
+            defer file.close();
 
-            const timestamp = std.mem.readInt(u32, entry_bytes[0..4], .little);
+            const file_size = try file.getEndPos();
+            if (file_size == 0) return;
 
-            // Keep entries that are newer than cutoff or if they're at the boundary
-            if (timestamp >= cutoff_timestamp) {
-                try valid_entries.append(entry_bytes);
+            const entry_count = file_size / entry_size;
+            if (file_size % entry_size != 0) {
+                break :blk true; // corrupted
             }
-        }
 
-        // If nothing was pruned, no need to rewrite
-        if (valid_entries.items.len == entry_count) {
+            const ts_i64 = std.time.timestamp();
+            const now_u64: u64 = if (ts_i64 < 0) 0 else @intCast(ts_i64);
+            const retention_seconds = @as(u64, retention_days) * 24 * 60 * 60;
+            const cutoff_u64 = if (now_u64 > retention_seconds) now_u64 - retention_seconds else 0;
+            const cutoff_timestamp: u32 = @intCast(@min(cutoff_u64, std.math.maxInt(u32)));
+
+            try file.seekTo(0);
+            var i: usize = 0;
+            while (i < entry_count) : (i += 1) {
+                var entry_bytes: [entry_size]u8 = undefined;
+                const bytes_read = try file.readAll(&entry_bytes);
+                if (bytes_read < entry_size) return error.UnexpectedEof;
+
+                const timestamp = std.mem.readInt(u32, entry_bytes[0..4], .little);
+
+                if (timestamp >= cutoff_timestamp) {
+                    try valid_entries.append(entry_bytes);
+                }
+            }
+
+            if (valid_entries.items.len == entry_count) {
+                return; // nothing pruned
+            }
+
+            should_rewrite = true;
+            break :blk false;
+        };
+
+        if (read_result) {
+            std.fs.cwd().deleteFile(self.seen_ids_file) catch {};
             return;
         }
 
-        // Rewrite file with only valid entries
-        file.close();
-        var write_file = try std.fs.cwd().createFile(self.seen_ids_file, .{});
-        defer write_file.close();
+        if (should_rewrite) {
+            const tmp_file_path = try std.fmt.allocPrint(self.allocator, "{s}.tmp", .{self.seen_ids_file});
+            defer self.allocator.free(tmp_file_path);
 
-        for (valid_entries.items) |entry| {
-            try write_file.writeAll(&entry);
+            var write_file = try std.fs.cwd().createFile(tmp_file_path, .{});
+            defer write_file.close();
+
+            for (valid_entries.items) |entry_val| {
+                try write_file.writeAll(&entry_val);
+            }
+
+            try std.fs.cwd().rename(tmp_file_path, self.seen_ids_file);
         }
     }
 };
