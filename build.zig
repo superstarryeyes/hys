@@ -232,6 +232,7 @@ pub fn build(b: *std.Build) void {
     filesystem_tests.root_module.addImport("types", types_mod);
     filesystem_tests.root_module.addImport("zdt", zdt_mod);
     filesystem_tests.root_module.addImport("daily_limiter", daily_limiter_mod);
+    filesystem_tests.root_module.addImport("feed_group_manager", feed_group_manager_mod);
     filesystem_tests.linkLibrary(expat_dep.artifact("expat"));
     filesystem_tests.linkLibC();
     linkCurl(filesystem_tests, curl_include_path, curl_lib_path);

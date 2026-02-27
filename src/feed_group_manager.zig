@@ -113,6 +113,54 @@ pub const FeedGroupManager = struct {
         try file.writeAll(json_string);
     }
 
+    /// Save updated ETags/Last-Modified headers for a group after fetching.
+    /// Loads the full group from disk (preserving disabled feeds), merges
+    /// updated headers from `fetched_feeds`, and writes back.
+    /// Skips silently if no feeds in `fetched_feed_group_names` match `group_name`.
+    pub fn saveUpdatedHeaders(
+        self: FeedGroupManager,
+        group_name: []const u8,
+        fetched_feeds: []const types.FeedConfig,
+        fetched_feed_group_names: []const []const u8,
+    ) !void {
+        // Check if this group has any fetched feeds
+        var has_fetched = false;
+        for (fetched_feed_group_names) |fgn| {
+            if (std.mem.eql(u8, fgn, group_name)) {
+                has_fetched = true;
+                break;
+            }
+        }
+        if (!has_fetched) return;
+
+        // Load full group to preserve disabled feeds and other metadata
+        var group = try self.loadGroupWithMetadata(group_name);
+        defer group.deinit(self.allocator);
+
+        // Update headers from fetched feeds
+        for (group.feeds) |*feed| {
+            if (!feed.enabled) continue;
+
+            for (fetched_feeds, 0..) |fetched_feed, idx| {
+                if (std.mem.eql(u8, fetched_feed_group_names[idx], group_name) and
+                    std.mem.eql(u8, fetched_feed.xmlUrl, feed.xmlUrl))
+                {
+                    if (fetched_feed.etag) |new_etag| {
+                        if (feed.etag) |old_etag| self.allocator.free(old_etag);
+                        feed.etag = try self.allocator.dupe(u8, new_etag);
+                    }
+                    if (fetched_feed.lastModified) |new_lm| {
+                        if (feed.lastModified) |old_lm| self.allocator.free(old_lm);
+                        feed.lastModified = try self.allocator.dupe(u8, new_lm);
+                    }
+                    break;
+                }
+            }
+        }
+
+        try self.saveGroupWithMetadata(group);
+    }
+
     /// Check if a group exists
     pub fn groupExists(self: FeedGroupManager, group_name: []const u8) bool {
         const filename = std.fmt.allocPrint(self.allocator, "{s}.json", .{group_name}) catch return false;

@@ -1022,35 +1022,12 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
     // Only do this for persistent groups (not command-line feeds)
     if (cmd_line_feeds.len == 0) {
         for (group_names) |g_name| {
-            // Filter feeds for this group
-            var group_feeds = std.array_list.Managed(types.FeedConfig).init(allocator);
-            defer group_feeds.deinit();
-
-            for (feeds_to_read, 0..) |feed, idx| {
-                if (std.mem.eql(u8, feed_group_names.items[idx], g_name)) {
-                    try group_feeds.append(feed);
-                }
-            }
-
-            // Get display name for saving
-            const d_name = config_manager.getGroupDisplayName(g_name) catch null;
-            defer if (d_name) |d| allocator.free(d);
-
-            // Create updated feed group with modified feed configurations
-            const updated_group = types.FeedGroup{
-                .name = try allocator.dupe(u8, g_name),
-                .display_name = if (d_name) |d| try allocator.dupe(u8, d) else null,
-                .feeds = group_feeds.items, // These now contain updated ETags/Last-Modified
-            };
-            // Manually free only what we allocated for the wrapper struct
-            defer {
-                allocator.free(updated_group.name);
-                if (updated_group.display_name) |d| allocator.free(d);
-            }
-
-            // Save the updated group configuration
-            config_manager.feed_group_manager.saveGroupWithMetadata(updated_group) catch {
-                const msg = try std.fmt.allocPrint(allocator, "Failed to save updated configuration for group '{s}'", .{g_name});
+            config_manager.feed_group_manager.saveUpdatedHeaders(
+                g_name,
+                feeds_to_read,
+                feed_group_names.items,
+            ) catch |err| {
+                const msg = try std.fmt.allocPrint(allocator, "Failed to save updated configuration for group '{s}': {}", .{ g_name, err });
                 defer allocator.free(msg);
                 display_manager.printError(msg);
             };
