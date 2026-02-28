@@ -40,8 +40,7 @@ Hys is a fast, lightweight, and opinionated terminal RSS reader written in Zig t
 
 ### Homebrew
 ```bash
-brew tap superstarryeyes/tap
-brew install hys
+brew install superstarryeyes/tap/hys
 ```
 
 ### Arch Linux (AUR)
