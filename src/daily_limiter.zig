@@ -602,11 +602,13 @@ pub const DailyLimiter = struct {
             defer self.allocator.free(tmp_file_path);
 
             var write_file = try std.fs.cwd().createFile(tmp_file_path, .{});
-            defer write_file.close();
+            errdefer write_file.close();
 
             for (valid_entries.items) |entry_val| {
                 try write_file.writeAll(&entry_val);
             }
+
+            write_file.close();
 
             try std.fs.cwd().rename(tmp_file_path, self.seen_ids_file);
         }
