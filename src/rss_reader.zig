@@ -1264,7 +1264,7 @@ pub const RssReader = struct {
             if (curl.curl_easy_setopt(handle, curl.CURLOPT_CONNECTTIMEOUT, @as(c_long, 5)) != curl.CURLE_OK) break :blk false;
             if (curl.curl_easy_setopt(handle, curl.CURLOPT_TIMEOUT, @as(c_long, 30)) != curl.CURLE_OK) break :blk false;
             if (curl.curl_easy_setopt(handle, curl.CURLOPT_ACCEPT_ENCODING, "") != curl.CURLE_OK) break :blk false;
-            if (curl.curl_easy_setopt(handle, curl.CURLOPT_USERAGENT, "hys-rss/0.1.2") != curl.CURLE_OK) break :blk false;
+            if (curl.curl_easy_setopt(handle, curl.CURLOPT_USERAGENT, "hys-rss/0.2.0") != curl.CURLE_OK) break :blk false;
             break :blk true;
         };
 
