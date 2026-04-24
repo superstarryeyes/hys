@@ -1,6 +1,7 @@
 # Zig build artifacts
 .zig-cache/
 zig-out/
+zig-pkg/
 build-*/
 
 # IDE and editor files

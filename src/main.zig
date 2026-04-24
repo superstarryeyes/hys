@@ -957,6 +957,14 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
     // Preserve order when groups were explicitly specified (not --all) and there are multiple groups
     const preserve_order = !cli.hasArg("--all") and group_names.len > 1;
 
+    // Calculate cutoff timestamp based on history retention days
+    // Items older than this will be silently ignored during processing
+    const cutoff_timestamp: i64 = cutoff: {
+        const now = std.time.timestamp();
+        const retention_seconds = @as(i64, @intCast(global_config.history.retentionDays)) * 24 * 60 * 60;
+        break :cutoff now - retention_seconds;
+    };
+
     // Process results - takes ownership of feed_config and parsed from results
     var all_items = try feed_processor.processResults(
         results,
@@ -969,6 +977,7 @@ fn runApp(allocator: std.mem.Allocator, args: [][:0]u8, stdout: *std.io.Writer) 
         &failed_feeds,
         cmd_line_feeds.len > 0,
         preserve_order,
+        cutoff_timestamp,
     );
     defer {
         for (all_items.items) |item| {

@@ -293,6 +293,7 @@ pub const FeedProcessor = struct {
         failed_feeds: *std.array_list.Managed([]const u8),
         skip_deduplication: bool,
         preserve_group_order: bool,
+        cutoff_timestamp: i64,
     ) !std.array_list.Managed(types.RssItem) {
         // Prevent index alignment bugs between results and original_feeds arrays
         std.debug.assert(results.len == original_feeds.len);
@@ -403,6 +404,11 @@ pub const FeedProcessor = struct {
 
             const max_items = display_manager.formatter.display_config.maxItemsPerFeed;
             for (pf.items) |item| {
+                // Filter out items older than the cutoff timestamp
+                // Items with unparseable dates (timestamp == 0) are kept to avoid data loss
+                if (item.timestamp > 0 and item.timestamp < cutoff_timestamp) {
+                    continue;
+                }
                 if (max_items > 0 and new_items.items.len >= max_items) break;
                 var identifier: ?[]const u8 = null;
                 if (item.guid) |guid| {
